@@ -2,7 +2,6 @@ import time
 import json
 import fjson
 import yaml
-from hexbytes import HexBytes
 
 from web3 import Web3
 from blocktimes import Blocktimes
@@ -20,7 +19,7 @@ BLOCKTIMES_FILENAME = DATA_DIR + 'blocktimes.json'
 TOKENS_FILENAME = 'tokens.yaml'
 TOKENS_EXPORT_FILENAME = DATA_DIR + 'tokens.json'
 FLOAT_FORMAT = '.5e'
-NOCODE = HexBytes('0x')
+NOCODE = b''
 
 with open(ABI_DIR + 'uniswap_v1_factory.json') as f:
     UNISWAP_V1_FAC_ABI = json.load(f)
