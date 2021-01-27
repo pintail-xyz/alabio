@@ -1,4 +1,4 @@
-from uniprice import AssetRegister
+from assetregister import AssetRegister
 
 ar = AssetRegister()
 ar.add_all_assets()

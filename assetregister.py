@@ -5,7 +5,8 @@ import yaml
 from hexbytes import HexBytes
 
 from web3 import Web3
-from blocktimes import Blocktimes, progress_string
+from blocktimes import Blocktimes
+from utils import find_first_change, progress_string
 
 NODE_URL = 'http://localhost:8545'
 UNISWAP_V1_FAC_ADR = '0xc0a47dFe034B400B47bDaD5FecDa2621de6c4d95'
@@ -19,6 +20,7 @@ BLOCKTIMES_FILENAME = DATA_DIR + 'blocktimes.json'
 TOKENS_FILENAME = 'tokens.yaml'
 TOKENS_EXPORT_FILENAME = DATA_DIR + 'tokens.json'
 FLOAT_FORMAT = '.5e'
+NOCODE = HexBytes('0x')
 
 with open(ABI_DIR + 'uniswap_v1_factory.json') as f:
     UNISWAP_V1_FAC_ABI = json.load(f)
@@ -28,21 +30,6 @@ with open(ABI_DIR + 'uniswap_v2_factory.json') as f:
     UNISWAP_V2_FAC_ABI = json.load(f)
 with open(ABI_DIR + 'uniswap_v2_exchange.json') as f:
     UNISWAP_V2_EXC_ABI = json.load(f)
-
-def get_deploy_block(web3, address, lower_bound=0, upper_bound='latest'):
-    nocode = HexBytes('0x')
-    if upper_bound == 'latest':
-        upper_bound = web3.eth.blockNumber
-
-    while upper_bound - lower_bound > 1:
-        mid = (lower_bound + upper_bound) // 2
-        code = web3.eth.getCode(address, block_identifier=mid)
-        if code == nocode:
-            lower_bound = mid
-        else:
-            upper_bound = mid
-
-    return upper_bound
 
 class AssetRegister:
     exchanges_v1 = {}
@@ -56,7 +43,14 @@ class AssetRegister:
         self.web3 = Web3(Web3.HTTPProvider(node_url))
         with open(tokens_filename) as f:
             self.token_lookup = yaml.full_load(f)
-        self.blocktimes = Blocktimes(filename=blocktimes_filename)
+
+        try:
+            with open(blocktimes_filename) as f:
+                pass
+            self.blocktimes = Blocktimes(filename=blocktimes_filename)
+        except FileNotFoundError:
+            print('no blocktimes file found, calculating from genesis')
+            self.blocktimes = Blocktimes()
 
     def add_all_assets(self):
         for sym in self.token_lookup:
@@ -185,7 +179,7 @@ class AssetRegister:
 
         #elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
         if last_update > 0:
-            print('0'*len(prog), end='\r')
+            print(' '*len(prog), end='\r')
 
         self.price_histories[address] = {'symbol':symbol,'address':address,
                                          'start_index':start_ind, 'prices':prices}
@@ -215,9 +209,16 @@ class AssetRegister:
         token_info = self.get_token_info(identifier)
         symbol, address = token_info['symbol'], token_info['address']
 
+        # with open(DATA_DIR + address.lower() + '.json', 'w') as f:
+        #     fjson.dump(self.price_histories[address], f,
+        #                float_format=FLOAT_FORMAT)#, separators=(',',':'))
+
         with open(DATA_DIR + address.lower() + '.json', 'w') as f:
-            fjson.dump(self.price_histories[address], f,
-                       float_format=FLOAT_FORMAT)#, separators=(',',':'))
+            data = fjson.dumps(self.price_histories[address],
+                               float_format=FLOAT_FORMAT)
+        # reduce JSON size by removing spaces
+            data = data.replace(': ', ':').replace(', ', ',')
+            f.write(data)
 
 
 def reweight_pools(pool_A, eth_A, pool_B, eth_B):
@@ -252,8 +253,11 @@ class UniswapV1Exchange:
         abi = get_abi(token_address)
         self.token_contract = web3.eth.contract(address=token_address, abi=abi)
         self.token_decimals = self.token_contract.functions.decimals().call()
-        self.deploy_block = get_deploy_block(self.web3, exchange_address,
-                                             lower_bound=UNISWAP_V1_DEPLOY_BLOCK)
+
+        func = lambda k: web3.eth.getCode(exchange_address, block_identifier=k)
+        self.deploy_block = find_first_change(
+            NOCODE, UNISWAP_V1_DEPLOY_BLOCK, web3.eth.blockNumber, func
+        )
 
     def get_ether_balance(self, block='latest'):
         raw = self.web3.eth.getBalance(self.contract.address,block)
@@ -291,8 +295,11 @@ class UniswapV2Exchange:
                                                   abi=token_B_abi)
         self.token_B_decimals = self.token_B_contract \
                                     .functions.decimals().call()
-        self.deploy_block = get_deploy_block(self.web3, self.address,
-                                             lower_bound=UNISWAP_V2_DEPLOY_BLOCK)
+
+        func = lambda k: web3.eth.getCode(self.address, block_identifier=k)
+        self.deploy_block = find_first_change(
+            NOCODE, UNISWAP_V2_DEPLOY_BLOCK, web3.eth.blockNumber, func
+        )
 
     def get_token_A_balance(self, block='latest'):
         raw = self.token_A_contract.functions.balanceOf(self.address)  \

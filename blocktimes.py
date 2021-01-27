@@ -5,45 +5,13 @@ import json
 
 from web3 import Web3
 
+from utils import interp_search, progress_string
+
 # genesis timestamp is not on blockchain, this is taken from etherscan.io
 GENESIS_TS = 1438269973
 NODE_URL = "http://localhost:8545"
 DELTA = 1800 # 1800 seconds = 30 minutes
 DEFAULT_FILENAME = 'data/blocktimes.json'
-
-def interp_search(target, x_range, y_range, func, mode='upper'):
-    # discrete interpolation search: assuming monotonic function y of x, find value of x
-    # which yields the closest value of y to the target
-    x_bounds, y_bounds = list(x_range), list(y_range)
-    eval_count = 0
-    while x_bounds[1] - x_bounds[0] > 1:
-        proportion = (target - y_bounds[0]) / (y_bounds[1] - y_bounds[0])
-        diff = max(1, round(proportion * (x_bounds[1] - x_bounds[0])))
-        x_estimate = min(x_bounds[0] + diff, x_bounds[1] - 1)
-        y_estimate = func(x_estimate)
-        eval_count += 1
-        if y_estimate == target:
-            return x_estimate, 0, eval_count
-        elif y_estimate < target:
-            x_bounds[0], y_bounds[0] = x_estimate, y_estimate
-        elif y_estimate > target:
-            x_bounds[1], y_bounds[1] = x_estimate, y_estimate
-
-    if mode == 'closest':
-        if y_bounds[1] - target >= target - y_bounds[0]:
-            return x_bounds[0], y_bounds[0] - target, eval_count
-        else:
-            return x_bounds[1], y_bounds[1] - target, eval_count
-    elif mode == 'lower':
-        return x_bounds[0], y_bounds[0] - target, eval_count
-    else:
-        return x_bounds[1], y_bounds[1] - target, eval_count
-
-def progress_string(current_iteration, total_iterations, start_time):
-    # write a progress statement which will be overwritten afterwards
-    elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
-    return (f"{current_iteration+1} of {total_iterations} "
-            f"({100*(current_iteration+1)/total_iterations:.2f}% complete) in {elapsed}")
 
 class Blocktimes:
     # object that can calculate, update, save, load and query a sequence of
@@ -154,12 +122,8 @@ class Blocktimes:
         dt = datetime.utcfromtimestamp(last_period)
         print(f"latest dt: {dt}, blocknum: {self.block_nums[-1]}")
 
-    def update(self, node_url=NODE_URL):
+    def update(self):
         # extend sequence of block numbers up to the present
-        self.print_latest()
-        next_tg = self.start_ts + self.delta * len(self.block_nums)
-        seed_bn = self.block_nums[-1]
-        seed_ts = self.start_ts + self.delta * (len(self.block_nums) - 1) + self.ts_offsets[-1]
         self.generate_sequence()
         self.print_latest()
 
