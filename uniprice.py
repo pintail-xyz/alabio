@@ -183,7 +183,9 @@ class AssetRegister:
                 print(prog, end='\r')
                 last_update = t
 
-        elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+        #elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
+        if last_update > 0:
+            print('0'*len(prog), end='\r')
 
         self.price_histories[address] = {'symbol':symbol,'address':address,
                                          'start_index':start_ind, 'prices':prices}
