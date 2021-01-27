@@ -5,7 +5,7 @@ import yaml
 from hexbytes import HexBytes
 
 from web3 import Web3
-from ethtoken.abi import EIP20_ABI
+#from ethtoken.abi import EIP20_ABI
 from blocktimes import Blocktimes, progress_string
 
 NODE_URL = 'http://localhost:8545'
@@ -14,19 +14,20 @@ UNISWAP_V1_DEPLOY_BLOCK = 6627917
 UNISWAP_V2_FAC_ADR = '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f'
 UNISWAP_V2_DEPLOY_BLOCK = 10000835
 WETH_ADR = '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2'
-DATA_DIR = 'data'
-BLOCKTIMES_FILENAME = DATA_DIR + '/blocktimes.json'
+DATA_DIR = 'data/'
+ABI_DIR = 'abi/'
+BLOCKTIMES_FILENAME = DATA_DIR + 'blocktimes.json'
 TOKENS_FILENAME = 'tokens.yaml'
-TOKENS_EXPORT_FILENAME = DATA_DIR + '/tokens.json'
+TOKENS_EXPORT_FILENAME = DATA_DIR + 'tokens.json'
 FLOAT_FORMAT = '.5e'
 
-with open('abi/uniswap_v1_factory.json') as f:
+with open(ABI_DIR + 'uniswap_v1_factory.json') as f:
     UNISWAP_V1_FAC_ABI = json.load(f)
-with open('abi/uniswap_v1_exchange.json') as f:
+with open(ABI_DIR + 'uniswap_v1_exchange.json') as f:
     UNISWAP_V1_EXC_ABI = json.load(f)
-with open('abi/uniswap_v2_factory.json') as f:
+with open(ABI_DIR + 'uniswap_v2_factory.json') as f:
     UNISWAP_V2_FAC_ABI = json.load(f)
-with open('abi/uniswap_v2_exchange.json') as f:
+with open(ABI_DIR + 'uniswap_v2_exchange.json') as f:
     UNISWAP_V2_EXC_ABI = json.load(f)
 
 def get_deploy_block(web3, address, lower_bound=0, upper_bound='latest'):
@@ -72,7 +73,7 @@ class AssetRegister:
         self.exchanges_v1[address] = v1_exchange
         self.exchanges_v2[address] = UniswapV2Exchange(self.web3, address)
         try:
-            with open(DATA_DIR + '/' + address.lower() + '.json') as f:
+            with open(DATA_DIR + address.lower() + '.json') as f:
                 self.price_histories[address] = json.load(f)
         except FileNotFoundError:
             print('no price history found for ' + symbol)
@@ -127,7 +128,7 @@ class AssetRegister:
             return None
         else:
             return (pool_B1 + pool_B2) / (pool_A1 + pool_A2)
-    
+
     def get_exchange(self, identifier, uniswap_version=2):
         token_info = self.get_token_info(identifier)
         address = token_info['address']
@@ -211,12 +212,12 @@ class AssetRegister:
                 result[symbol] = self.price_histories[address]['prices']
 
         return result
-        
+
     def save_price_history(self, identifier):
         token_info = self.get_token_info(identifier)
         symbol, address = token_info['symbol'], token_info['address']
 
-        with open(DATA_DIR + '/' + address.lower() + '.json', 'w') as f:
+        with open(DATA_DIR + address.lower() + '.json', 'w') as f:
             fjson.dump(self.price_histories[address], f,
                        float_format=FLOAT_FORMAT)#, separators=(',',':'))
 
@@ -232,11 +233,13 @@ def reweight_pools(pool_A, eth_A, pool_B, eth_B):
         return pool_A, eth_A / B_price
 
 def get_abi(token_address):
+    # check whether we have a specific abi for this address, else use ERC-20
     try:
-        with open('abi/' + token_address.lower() + '.json') as f:
+        with open(ABI_DIR + token_address.lower() + '.json') as f:
             abi = json.load(f)
     except FileNotFoundError:
-        abi = EIP20_ABI
+        with open(ABI_DIR + 'erc20.json') as f:
+            abi = json.load(f)
     return abi
 
 class UniswapV1Exchange:
@@ -266,7 +269,7 @@ class UniswapV1Exchange:
     def get_pools(self, block='latest'):
         if isinstance(block, int) and block < self.deploy_block:
             return 0, 0
-        else: 
+        else:
             return self.get_erc20_balance(block), self.get_ether_balance(block)
 
 class UniswapV2Exchange:
