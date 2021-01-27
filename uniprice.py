@@ -5,7 +5,6 @@ import yaml
 from hexbytes import HexBytes
 
 from web3 import Web3
-#from ethtoken.abi import EIP20_ABI
 from blocktimes import Blocktimes, progress_string
 
 NODE_URL = 'http://localhost:8545'
@@ -184,10 +183,7 @@ class AssetRegister:
                 print(prog, end='\r')
                 last_update = t
 
-        # print(' ' * len(prog), end='\r')
-        print(symbol + ' price at block ' + str(b.block_nums[-1]) + ' = ' + str(prices[len(b.block_nums)-1-start_ind]))
         elapsed = time.strftime("%H:%M:%S", time.gmtime(time.time() - start_time))
-        # print(f"completed {symbol} price history in {elapsed}")
 
         self.price_histories[address] = {'symbol':symbol,'address':address,
                                          'start_index':start_ind, 'prices':prices}
